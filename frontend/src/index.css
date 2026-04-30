@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg-base: #0B1010;
+  --bg-surface: #141C1C;
+  --bg-elevated: #1E2929;
+  --ink-primary: #F8FAFA;
+  --ink-secondary: #A1B0B0;
+  --ink-tertiary: #687777;
+  --brand: #2B8A8F;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-base);
+  color: var(--ink-primary);
+  font-family: "Work Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+body {
+  min-height: 100vh;
+  /* subtle radial vignette on app base for "grounded" feel without flat black */
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(43,138,143,0.08), transparent 60%),
+    radial-gradient(1000px 500px at -10% 110%, rgba(43,138,143,0.05), transparent 60%),
+    var(--bg-base);
+}
+
+input, textarea, select, button {
+  font-family: inherit;
+  color: inherit;
+}
+
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+::selection { background: rgba(43,138,143,0.45); color: #fff; }
+
+/* Hide scrollbars on horizontal scroll containers */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Form rows */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  min-height: 56px;
+}
+.row:last-child { border-bottom: none; }
+
+.input {
+  width: 100%;
+  background: var(--bg-elevated);
+  color: var(--ink-primary);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-height: 48px;
+  font-size: 16px; /* avoid iOS auto-zoom */
+}
+.input::placeholder { color: var(--ink-tertiary); }
+.input:focus { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); outline: none; }
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-secondary);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-family: "Manrope", system-ui, sans-serif;
+  transition: transform 75ms ease, opacity 150ms ease, background-color 150ms ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+}
+.btn:active { transform: scale(0.98); opacity: 0.92; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:hover { background: #2f9aa0; }
+.btn-secondary { background: var(--bg-elevated); color: var(--ink-primary); border-color: rgba(255,255,255,0.10); }
+.btn-ghost { background: transparent; color: var(--ink-primary); }
+.btn-danger { background: rgba(244,63,94,0.15); color: #FB7185; border-color: rgba(244,63,94,0.3); }
+
+.card {
+  background: var(--bg-surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.08);
+  white-space: nowrap;
+}
+.chip[data-active="true"] {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
+.glass-bottom {
+  background: rgba(11,16,16,0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+/* Page width: mobile constrained */
+.page-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Dashboard pie tooltip override */
+.recharts-default-tooltip {
+  background: rgba(20,28,28,0.95) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  border-radius: 8px !important;
+  color: var(--ink-primary) !important;
+}

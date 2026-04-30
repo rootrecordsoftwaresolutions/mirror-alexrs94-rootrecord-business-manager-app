@@ -27,6 +27,10 @@ From `root-record-business-manager/` (next to `Build-Installer.bat`):
 
 Destination defaults to `Desktop\rootrecord-bm-export-<timestamp>`. Use `-OutputPath` to set a folder. Each export includes **`EXPORT_README.txt`** at the destination.
 
+## UI screenshots
+
+See **`screenshots/`** in this `docs/` folder (`photo_*.jpg`) for visual context of the shipped app.
+
 ## Reading order (maximum context, minimum thrash)
 
 1. **`../EMERGENT_APP_VERSION.md`** — version bump → build → optional GitHub release.

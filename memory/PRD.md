@@ -29,10 +29,11 @@ User clarification (verbatim): *"This is my project. I just want you to build a 
 ## What's been implemented (2026-04-30)
 - All 13 modules above, mobile-responsive, with `data-testid` on every interactive element.
 - Backend with full CRUD endpoints for each module.
-- JWT auth with bcrypt; admin seeded on startup (`admin@rootrecord.app` / `admin123`, plan=Pro).
+- **Auth wired to the live RootRecord licence Worker** (2026-04-30 follow-up): backend proxies `/api/auth/{login,register,me,logout,entitlement}` to `https://rootrecord-license.rootrecord.workers.dev`. Same email/password as the Windows installer works on mobile. `account_id` from the Worker is the canonical user id for owned-data scoping. Plan derivation: `access=full + (reason=paid OR subscription_status=active) → pro`. 5-minute in-memory token cache. `device_id` generated client-side and persisted in localStorage (parity with desktop's `loadOrCreateDeviceId`). HTML 5xx from upstream is sanitized into short user-facing messages. 429 (rate-limit) is passed through to the client. Local password storage removed.
 - Default work categories (12) seeded for new users; default business profile auto-created.
 - Demo data shows hours, income, expenses, net, and a category breakdown chart.
-- **Quick Actions** (2026-04-30 follow-up): one-tap clock-in shortcuts on the Dashboard. Default seeds (Code/Meeting/Review) match desktop's `FACTORY_QUICK_ACTION_SEEDS`. Manage from the Track screen — add, delete, run. Active-session banner with live timer & stop button on Dashboard. Endpoints: `/api/quick-actions` (list/post/patch/delete) + `/api/quick-actions/{id}/run`.
+- **Quick Actions**: one-tap clock-in shortcuts on the Dashboard. Default seeds (Code/Meeting/Review) match desktop's `FACTORY_QUICK_ACTION_SEEDS`. Manage from the Track screen — add, delete, run. Active-session banner with live timer & stop button on Dashboard. Endpoints: `/api/quick-actions` (list/post/patch/delete) + `/api/quick-actions/{id}/run`.
+- **Account Settings**: shows real subscription status from the Worker, "Refresh entitlement" button (calls `/api/auth/entitlement`), and a clean external "Upgrade on rootrecord.info" link (no more demo upgrade).
 
 ## Known gaps / next phase (P1)
 - **Cloud sync**: the desktop app pushes/pulls via `https://rootrecord-license.rootrecord.workers.dev/v1/sync/{push,pull}`. The mobile build today only writes to its own MongoDB; wiring to the licence Worker is deferred (would also enable session-token parity with the desktop installer).

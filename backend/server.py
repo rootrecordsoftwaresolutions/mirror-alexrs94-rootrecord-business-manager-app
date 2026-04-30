@@ -78,11 +78,7 @@ async def _worker_post(path: str, body: dict, bearer: Optional[str] = None) -> t
             r = await cx.post(url, json=body, headers=headers)
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail=f"Licence service unreachable: {e}")
-    try:
-        data = r.json()
-    except Exception:
-        data = {"detail": r.text or f"HTTP {r.status_code}"}
-    return r.status_code, data
+    return _normalize_worker_response(r)
 
 async def _worker_get(path: str, bearer: str) -> tuple[int, dict]:
     if not LICENSE_API_BASE_URL:
@@ -93,11 +89,32 @@ async def _worker_get(path: str, bearer: str) -> tuple[int, dict]:
             r = await cx.get(url, headers={"Authorization": f"Bearer {bearer}"})
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail=f"Licence service unreachable: {e}")
-    try:
-        data = r.json()
-    except Exception:
-        data = {"detail": r.text or f"HTTP {r.status_code}"}
-    return r.status_code, data
+    return _normalize_worker_response(r)
+
+def _normalize_worker_response(r) -> tuple[int, dict]:
+    """Parse a Worker response into (status, json-ish dict). When the Worker returns
+    HTML (e.g. Cloudflare error 1101/1102), surface a short message instead of the
+    raw 4KB HTML page."""
+    ctype = (r.headers.get("content-type") or "").lower()
+    text = r.text or ""
+    if "application/json" in ctype:
+        try:
+            return r.status_code, r.json()
+        except Exception:
+            pass
+    looks_like_html = "<html" in text.lower() or "<!doctype" in text.lower()
+    if looks_like_html or not text.strip():
+        # Log full HTML server-side for forensics; user gets the short message.
+        try:
+            print(f"[licence-worker] non-JSON {r.status_code} response from {r.request.url}: {text[:512]}")
+        except Exception:
+            pass
+        msg = "Sign-in service is temporarily unavailable — try again in a moment."
+        if r.status_code == 429:
+            msg = "Too many sign-in attempts — try again in a minute."
+        return r.status_code, {"detail": msg}
+    # Non-HTML, non-JSON (e.g. plain text). Cap to keep responses sane.
+    return r.status_code, {"detail": (text.strip()[:300] or f"HTTP {r.status_code}")}
 
 def _worker_error(status: int, body: dict) -> str:
     if isinstance(body, dict):
@@ -224,7 +241,8 @@ async def login(body: LoginIn):
     if status >= 400:
         # Map worker error strings into the messages the desktop app uses.
         msg = _worker_error(status, body_resp)
-        raise HTTPException(status_code=status if status in (400, 401, 403, 409) else 502, detail=msg)
+        passthrough = {400, 401, 403, 409, 422, 429}
+        raise HTTPException(status_code=status if status in passthrough else 502, detail=msg)
     token = str(body_resp.get("access_token") or "").strip()
     if not token:
         raise HTTPException(status_code=502, detail="Licence service did not return a token.")
@@ -265,7 +283,8 @@ async def register(body: RegisterIn):
     })
     if status >= 400:
         msg = _worker_error(status, body_resp)
-        raise HTTPException(status_code=status if status in (400, 401, 403, 409) else 502, detail=msg)
+        passthrough = {400, 401, 403, 409, 422, 429}
+        raise HTTPException(status_code=status if status in passthrough else 502, detail=msg)
     token = str(body_resp.get("access_token") or "").strip()
     if not token:
         raise HTTPException(status_code=502, detail="Licence service did not return a token.")
@@ -325,7 +344,8 @@ async def refresh_entitlement(body: EntitlementIn, current=Depends(get_current_u
         "email": current["email"], "device_id": device_id,
     }, bearer=token)
     if status >= 400:
-        raise HTTPException(status_code=status if status in (400, 401, 403) else 502, detail=_worker_error(status, body_resp))
+        passthrough = {400, 401, 403, 422, 429}
+        raise HTTPException(status_code=status if status in passthrough else 502, detail=_worker_error(status, body_resp))
     plan = _plan_from_entitlement(body_resp)
     await db.users.update_one(
         {"id": current["id"]},

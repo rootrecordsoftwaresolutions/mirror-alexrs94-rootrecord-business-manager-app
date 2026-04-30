@@ -1,0 +1,5 @@
+# Packaged next to app (see scripts/build-windows.cjs) as resources/app-update.yml.
+# electron-updater uses this to locate the GitHub repo for releases.
+provider: github
+owner: RootRecord
+repo: rootrecord-business-manager-download

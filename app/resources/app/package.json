@@ -1,0 +1,48 @@
+{
+  "name": "root-record-business-manager-v2",
+  "version": "2.0.12",
+  "private": true,
+  "description": "RootRecord Business Manager — desktop application",
+  "main": "src/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RootRecord/rootrecord-business-manager-download.git"
+  },
+  "microsoftStore": {
+    "productId": "xp9k0bcs18g16p",
+    "listingUrl": "https://apps.microsoft.com/detail/xp9k0bcs18g16p?hl=en-US&gl=US"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist:win": "node scripts/build-windows.cjs",
+    "build:installer": "node scripts/build-installer.cjs",
+    "build:installer:signed": "node scripts/build-installer.cjs",
+    "build:installer:signed:no-bump": "node scripts/build-installer.cjs",
+    "bump:patch": "node scripts/bump-patch.cjs",
+    "write:latest-yml": "node scripts/write-latest-yml.cjs",
+    "release:publish-github": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/publish-github-release.ps1",
+    "bundle:biz-app": "node scripts/copy-biz-app-bundle.cjs",
+    "bundle:biz-app:no-zip": "node scripts/copy-biz-app-bundle.cjs --no-zip"
+  },
+  "keywords": [
+    "electron",
+    "rootrecord",
+    "business"
+  ],
+  "author": "Root Record Developer",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-packager": "^17.1.2"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.6.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
+    "luxon": "^3.7.2",
+    "sqlite3": "^6.0.1"
+  }
+}

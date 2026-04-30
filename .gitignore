@@ -1,0 +1,7 @@
+**/node_modules/
+**/build/output/
+*.log
+.DS_Store
+Thumbs.db
+# Too large for GitHub; build locally or pull from Releases
+**/RootRecordBusinessManager.exe

@@ -1,0 +1,120 @@
+{
+  "app": "RootRecord Business Manager",
+  "theme": "dark",
+  "archetype": "Organic & Earthy (Deep Dark Mode Variant)",
+  "typography": {
+    "primary_heading_font": "Manrope",
+    "body_font": "Work Sans",
+    "rationale": "Manrope provides a grounded, stable, and slightly rounded geometric feel perfect for a business tool that needs to feel human. Work Sans ensures impeccable legibility in dense data tables and mobile lists. Avoids generic Inter/Roboto entirely.",
+    "scales": {
+      "h1": "text-3xl font-bold tracking-tight",
+      "h2": "text-2xl font-bold tracking-tight",
+      "h3": "text-xl font-semibold",
+      "body": "text-base font-normal",
+      "label": "text-sm font-medium text-gray-400 uppercase tracking-widest",
+      "small": "text-xs font-normal"
+    }
+  },
+  "colors": {
+    "brand": {
+      "teal_primary": "#2B8A8F",
+      "teal_light": "#45A7AC",
+      "teal_dark": "#19666B",
+      "teal_subtle_bg": "rgba(43, 138, 143, 0.15)"
+    },
+    "background": {
+      "app_base": "#0B1010",
+      "surface": "#141C1C",
+      "surface_elevated": "#1E2929",
+      "glass_overlay": "rgba(11, 16, 16, 0.75)"
+    },
+    "text": {
+      "primary": "#F8FAFA",
+      "secondary": "#A1B0B0",
+      "tertiary": "#687777",
+      "on_brand": "#FFFFFF"
+    },
+    "semantic": {
+      "income_green": "#10B981",
+      "income_bg": "rgba(16, 185, 129, 0.1)",
+      "expense_red": "#F43F5E",
+      "expense_bg": "rgba(244, 63, 94, 0.1)",
+      "warning_amber": "#F59E0B",
+      "info_blue": "#3B82F6"
+    },
+    "borders": {
+      "subtle": "rgba(255, 255, 255, 0.06)",
+      "strong": "rgba(255, 255, 255, 0.12)"
+    },
+    "charts_10_plus": [
+      "#2B8A8F",
+      "#10B981",
+      "#F59E0B",
+      "#F43F5E",
+      "#8B5CF6",
+      "#06B6D4",
+      "#EC4899",
+      "#EAB308",
+      "#14B8A6",
+      "#6366F1",
+      "#A855F7",
+      "#F97316"
+    ]
+  },
+  "spacing_and_layout": {
+    "touch_targets": "min-h-[44px] min-w-[44px] for all interactive elements",
+    "safe_area": "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
+    "container_padding": "px-4 md:px-6",
+    "grid_gap": "gap-4",
+    "radius": {
+      "card": "rounded-2xl",
+      "form_group": "rounded-2xl",
+      "button": "rounded-xl",
+      "input": "rounded-xl",
+      "badge": "rounded-full"
+    }
+  },
+  "patterns": {
+    "bottom_nav": {
+      "layout": "Fixed bottom, full width, flex justify-around items-center min-h-[64px] pb-[env(safe-area-inset-bottom)]",
+      "background": "backdrop-blur-xl bg-[#0B1010]/80 border-t border-white/5",
+      "active_state": "text-[#2B8A8F] font-semibold (icon filled)",
+      "inactive_state": "text-[#687777] font-normal (icon outline)",
+      "keyboard_behavior": "Must be hidden when virtual keyboard is active (use CSS media queries or React visualViewport listeners)",
+      "more_tab": "The 5th tab must be 'More' with a Hamburger/Menu icon that opens a slide-up Shadcn Drawer for the remaining modules."
+    },
+    "cards": {
+      "kpi_card": "bg-[#141C1C] border border-white/5 rounded-2xl p-4 flex flex-col justify-between",
+      "list_card": "bg-[#141C1C] rounded-2xl overflow-hidden border border-white/5 shadow-sm"
+    },
+    "forms_and_lists": {
+      "group_container": "bg-[#141C1C] rounded-2xl border border-white/5 overflow-hidden",
+      "row_item": "flex items-center justify-between p-4 border-b border-white/5 last:border-b-0 min-h-[56px] active:bg-[#1E2929] transition-colors",
+      "input_field": "w-full bg-[#1E2929] text-[#F8FAFA] placeholder:text-[#687777] border border-white/10 rounded-xl px-4 min-h-[48px] focus:border-[#2B8A8F] focus:ring-1 focus:ring-[#2B8A8F]"
+    },
+    "tabs_segmented_control": {
+      "container": "bg-[#0B1010] p-1 rounded-xl flex border border-white/5",
+      "tab": "flex-1 text-center py-2 rounded-lg text-sm font-medium transition-all min-h-[44px] flex items-center justify-center",
+      "active_tab": "bg-[#1E2929] text-[#F8FAFA] shadow-sm",
+      "inactive_tab": "text-[#687777] hover:text-[#A1B0B0]"
+    },
+    "pro_badge": {
+      "design": "bg-[#2B8A8F]/15 border border-[#2B8A8F]/30 text-[#45A7AC] px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-1",
+      "icon": "Requires a small glowing star or root icon next to the text."
+    }
+  },
+  "motion": {
+    "transitions": "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+    "tap_highlight": "active:scale-[0.98] active:opacity-80 transition-transform duration-75",
+    "drawer_slide": "Framer motion slide up from 100% to 0% with spring stiffness 300 damping 30"
+  },
+  "instructions_to_main_agent": [
+    "Create a mobile-first PWA. All pages must be constrained to typical mobile widths on desktop (max-w-md mx-auto) or elegantly expand into a tablet view.",
+    "Ensure lucide-react is installed for all icons. Use filled icons for active nav states and outline for inactive.",
+    "Add data-testid attributes to ALL interactive elements (buttons, inputs, tabs, list items) to facilitate testing.",
+    "For 'Finance & Clients', implement a horizontal scrollable segmented control or a sticky sub-header with tabs, since it has 8 sub-modules.",
+    "Use Recharts or Shadcn Charts for the Dashboard pie and bar charts, mapping to the 10+ chart colors array provided.",
+    "Ensure strictly no 'pure' #000000 black. Always use the specified #0B1010 to maintain the 'grounded' earthy tint.",
+    "Do NOT use HTML native components for dropdowns/calendars, use heavily customized Shadcn components matching the dark theme."
+  ]
+}

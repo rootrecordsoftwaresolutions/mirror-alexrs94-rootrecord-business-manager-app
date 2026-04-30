@@ -181,19 +181,40 @@ Unless product owner removes these:
 
 ---
 
-## 8. Prompt text you can paste into an agent (minimal wrapper)
+## 8. Prompt text — paste this entire block into your agent
 
 ```
-You are implementing RootRecord Business Manager for Android.
+You are building RootRecord Business Manager for Android: local-first business data (time, money, clients, inventory, scheduling, reports), SQLite on device, and the same RootRecord account + licence model as the Windows app. Match how we ship Weather Manager on mobile (process + stack), not a greenfield guess.
 
-Constraints:
-- Study the existing Android reference implementation (clone): https://github.com/RootRecord/rr-weather-manager-mobile — README, docs/, Capacitor frontend, Android Gradle, release flow. Public APK home (no source): https://github.com/RootRecord/rootrecord-weather-manager-mobile/releases
-- Read Business Manager desktop behavior: https://github.com/RootRecord/rootrecord-business-manager-app — app/resources/app/ (README, docs/BM_EXPORT, docs/screenshots, licenseService.js, database paths).
-- Mirror Weather’s process: private mobile source repo + public releases-only repo; React+Capacitor unless ADR says otherwise.
-- Reuse existing Cloudflare APIs: license + primary workers; same URLs as rootrecord-sites-reference.env (monorepo) for non-secret values.
-- Local-first SQLite on device; no new server-side product DB without an approved design.
+REFERENCE IMPLEMENTATION — WEATHER MANAGER ANDROID (clone and actually read the code)
+- Private source (React + Capacitor 6, frontend/, backend/, Gradle, docs): https://github.com/RootRecord/rr-weather-manager-mobile
+- Public repo (APKs, changelog, consumer README — NO application source): https://github.com/RootRecord/rootrecord-weather-manager-mobile
+- Install builds from: https://github.com/RootRecord/rootrecord-weather-manager-mobile/releases
+- In that private repo, read README.md (pnpm workspace, pnpm weather:start, android:assemble, android:play:ready), docs/PORTING-AND-INTEGRATION.md, docs/SECURITY-AND-SECRETS.md. Copy the discipline: separate private source from public release artifacts.
 
-Deliver: ADR, repo layout, schema port plan, licence client module, first vertical slice UI, CI debug APK, and public-repo release notes template.
+DESKTOP PRODUCT YOU ARE PORTING — BUSINESS MANAGER
+- App snapshot repo (Electron + SQLite, what to parity): https://github.com/RootRecord/rootrecord-business-manager-app
+- After clone, work from app/resources/app/: README.md, docs/BM_EXPORT.md, docs/ANDROID_PORT_MASTER_PROMPT.md (this file’s sections 2–7), docs/screenshots/, src/main/licenseService.js, src/main/database.js, src/main/paths.js, renderer as UX reference (expect a full mobile UI rewrite).
+
+OPTIONAL FULL MONOREPO (only if the operator gives you this tree instead of the BM snapshot)
+- https://github.com/RootRecord/rootrecord-workspace — may contain Mobile App Development/ as a checkout; Weather’s canonical remote is still https://github.com/RootRecord/rr-weather-manager-mobile , not “whatever folder name exists locally.”
+
+PUBLIC SITE + HTTP APIs (do not invent hosts)
+- Marketing + account portal: https://rootrecord.info (account flows use same-origin /v1 on the site; understand before you call Workers from a WebView or native client).
+- Primary Worker (auth, weather, other routes): https://rootrecord-primary.rootrecord.workers.dev
+- License Worker (desktop licence flows; Android must speak the same contract as licenseService.js): https://rootrecord-license.rootrecord.workers.dev
+- Non-secret env mirror (Stripe publishable, pricing table ids, etc., if present in the tree you were given): file rootrecord-sites-reference.env at monorepo root in rootrecord-workspace.
+
+ARCHITECTURE
+- Default plan: React + Capacitor like Weather unless you write an ADR choosing Kotlin/Compose with clear tradeoffs.
+- Local-first SQLite; no new server-side canonical business DB without an approved sync design.
+- Reuse existing Cloudflare Workers + D1; extend only what exists.
+
+DELIVERABLES
+1) Short ADR (stack choice). 2) New repo layout: private rr-business-manager-mobile (or agreed name) + public rootrecord-business-manager-mobile for APK-only, mirroring Weather. 3) SQLite schema / migration plan from desktop. 4) Licence client module matching licenseService.js HTTP behavior + secure token storage on Android. 5) One vertical slice UI + CI producing a debug APK. 6) Public-repo release notes template for first internal APK.
+
+NON-GOALS V1
+Full parity with every desktop report on day one; Electron on Android; breaking licence_accounts/D1 without migrations.
 ```
 
 ---

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { ScreenHeader, PageContainer, Section, Field, Empty, Toast, useToast } from "../ui/Shell";
 import { fmtDateShort, durationHours, fmtHours, isoNow } from "../../lib/format";
-import { Play, Square, PlusCircle } from "lucide-react";
+import { Play, Square, PlusCircle, Zap, Trash2, Plus } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function TimeTracking() {
@@ -22,17 +22,25 @@ export default function TimeTracking() {
   const [mCat, setMCat] = useState("");
   const [mDesc, setMDesc] = useState("");
 
+  // Quick actions
+  const [quickActions, setQuickActions] = useState([]);
+  const [qaLabel, setQaLabel] = useState("");
+  const [qaCat, setQaCat] = useState("");
+  const [qaDesc, setQaDesc] = useState("");
+
   async function load() {
     if (guest) return;
     try {
-      const [s, c, p] = await Promise.all([
+      const [s, c, p, q] = await Promise.all([
         api.get("/time/session"),
         api.get("/categories"),
         api.get("/projects"),
+        api.get("/quick-actions"),
       ]);
       setSession(s.data?.active ? s.data : null);
       setCategories(c.data || []);
       setProjects(p.data || []);
+      setQuickActions(q.data || []);
       if (c.data?.[0] && !categoryId) setCategoryId(c.data[0].id);
     } catch {/* ignore */}
   }
@@ -78,6 +86,39 @@ export default function TimeTracking() {
       setMStart(""); setMEnd(""); setMDesc("");
       show("Manual entry saved", "success");
     } catch { show("Could not save", "error"); }
+  }
+
+  async function addQa(e) {
+    e.preventDefault();
+    if (!qaLabel.trim()) return show("Label required", "error");
+    try {
+      await api.post("/quick-actions", {
+        label: qaLabel.trim(),
+        category_id: qaCat || null,
+        default_description: qaDesc,
+        icon: "Zap",
+        sort_order: quickActions.length,
+      });
+      setQaLabel(""); setQaDesc(""); setQaCat("");
+      show("Quick action added", "success");
+      load();
+    } catch { show("Could not save", "error"); }
+  }
+
+  async function delQa(id) {
+    try {
+      await api.delete(`/quick-actions/${id}`);
+      load();
+    } catch { show("Could not delete", "error"); }
+  }
+
+  async function runQa(qa) {
+    if (session) return show("Already on the clock", "error");
+    try {
+      const { data } = await api.post(`/quick-actions/${qa.id}/run`);
+      setSession(data);
+      show(`Clocked in: ${qa.label}`, "success");
+    } catch { show("Could not start", "error"); }
   }
 
   return (
@@ -136,6 +177,42 @@ export default function TimeTracking() {
                     <Play size={18} fill="currentColor" /> Clock in
                   </button>
                 )}
+              </div>
+            </Section>
+
+            <Section title="Quick actions" action={<span className="text-[10px] text-ink-tertiary">One-tap clock-in</span>}>
+              <div className="p-3">
+                {quickActions.length === 0 ? (
+                  <p className="text-sm text-ink-tertiary text-center py-2">No quick actions yet.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {quickActions.map((qa) => (
+                      <div key={qa.id} className="flex items-center gap-1 rounded-xl bg-bg-elevated border border-strong px-1 pl-3">
+                        <button
+                          data-testid={`track-qa-run-${qa.id}`}
+                          onClick={() => runQa(qa)}
+                          disabled={!!session}
+                          className="flex items-center gap-2 py-2 pr-2 disabled:opacity-50"
+                        >
+                          <Zap size={14} className="text-brand" />
+                          <span className="text-sm font-semibold">{qa.label}</span>
+                        </button>
+                        <button data-testid={`track-qa-del-${qa.id}`} onClick={() => delQa(qa.id)} className="p-2 text-ink-tertiary hover:text-expense">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <form onSubmit={addQa} className="grid grid-cols-2 gap-2 pt-2 border-t border-subtle">
+                  <input data-testid="qa-label" className="input col-span-2" placeholder="Label (e.g. Code)" value={qaLabel} onChange={(e) => setQaLabel(e.target.value)} />
+                  <select data-testid="qa-category" className="input" value={qaCat} onChange={(e) => setQaCat(e.target.value)}>
+                    <option value="">— category —</option>
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <input data-testid="qa-desc" className="input" placeholder="Description" value={qaDesc} onChange={(e) => setQaDesc(e.target.value)} />
+                  <button data-testid="qa-add-btn" className="btn btn-secondary col-span-2"><Plus size={14} /> Add quick action</button>
+                </form>
               </div>
             </Section>
 

@@ -32,6 +32,7 @@ User clarification (verbatim): *"This is my project. I just want you to build a 
 - JWT auth with bcrypt; admin seeded on startup (`admin@rootrecord.app` / `admin123`, plan=Pro).
 - Default work categories (12) seeded for new users; default business profile auto-created.
 - Demo data shows hours, income, expenses, net, and a category breakdown chart.
+- **Quick Actions** (2026-04-30 follow-up): one-tap clock-in shortcuts on the Dashboard. Default seeds (Code/Meeting/Review) match desktop's `FACTORY_QUICK_ACTION_SEEDS`. Manage from the Track screen — add, delete, run. Active-session banner with live timer & stop button on Dashboard. Endpoints: `/api/quick-actions` (list/post/patch/delete) + `/api/quick-actions/{id}/run`.
 
 ## Known gaps / next phase (P1)
 - **Cloud sync**: the desktop app pushes/pulls via `https://rootrecord-license.rootrecord.workers.dev/v1/sync/{push,pull}`. The mobile build today only writes to its own MongoDB; wiring to the licence Worker is deferred (would also enable session-token parity with the desktop installer).

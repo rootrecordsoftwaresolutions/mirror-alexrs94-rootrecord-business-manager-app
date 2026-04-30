@@ -1,13 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { api } from "../../lib/api";
-import { ScreenHeader, PageContainer, Section, Spinner, Empty } from "../ui/Shell";
-import { fmtMoney, fmtHours, MONTHS_SHORT, startOfMonthISO, endOfMonthISO, startOfYearISO, isoNow } from "../../lib/format";
-import { TrendingUp, AlertCircle } from "lucide-react";
+import { ScreenHeader, PageContainer, Section, Spinner, Empty, Toast, useToast } from "../ui/Shell";
+import { fmtMoney, fmtHours, MONTHS_SHORT, startOfMonthISO, endOfMonthISO, startOfYearISO, isoNow, durationHours } from "../../lib/format";
+import { TrendingUp, AlertCircle, Code, Users, FileSearch, Zap, Square, Play } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+
+const ICON_MAP = { Code, Users, FileSearch, Zap, Play };
 
 export default function Dashboard() {
   const { guest, user } = useAuth();
+  const nav = useNavigate();
+  const { toast, show, clear } = useToast();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -15,32 +20,75 @@ export default function Dashboard() {
   const [monthIdx, setMonthIdx] = useState(new Date().getMonth());
   const year = new Date().getFullYear();
 
+  // Quick actions state
+  const [quickActions, setQuickActions] = useState([]);
+  const [session, setSession] = useState(null);
+  const [tickN, setTickN] = useState(0); // re-render every 30s while clocked in
+
   const [start, end] = useMemo(() => {
     if (scope === "year") return [startOfYearISO(), isoNow()];
     return [startOfMonthISO(year, monthIdx), endOfMonthISO(year, monthIdx)];
   }, [scope, monthIdx, year]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (guest || !user) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      setError("");
-      try {
-        const { data } = await api.get("/dashboard/summary", { params: { start, end } });
-        if (!cancelled) setSummary(data);
-      } catch (e) {
-        if (!cancelled) setError(e?.message || "Failed to load");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  async function loadSummary() {
+    if (guest || !user) {
+      setLoading(false);
+      return;
     }
-    load();
-    return () => { cancelled = true; };
-  }, [start, end, guest, user]);
+    setLoading(true);
+    setError("");
+    try {
+      const { data } = await api.get("/dashboard/summary", { params: { start, end } });
+      setSummary(data);
+    } catch (e) {
+      setError(e?.message || "Failed to load");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadQuickAndSession() {
+    if (guest || !user) return;
+    try {
+      const [{ data: qa }, { data: s }] = await Promise.all([
+        api.get("/quick-actions"),
+        api.get("/time/session"),
+      ]);
+      setQuickActions(qa || []);
+      setSession(s?.active ? s : null);
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => { loadSummary(); }, [start, end, guest, user]); // eslint-disable-line
+  useEffect(() => { loadQuickAndSession(); }, [guest, user]); // eslint-disable-line
+
+  // Live timer: tick every 30s while clocked in
+  useEffect(() => {
+    if (!session) return;
+    const t = setInterval(() => setTickN((n) => n + 1), 30000);
+    return () => clearInterval(t);
+  }, [session]);
+
+  async function runQuick(qa) {
+    if (guest) return show("Sign in to track time", "error");
+    if (session) return show("Already on the clock", "error");
+    try {
+      const { data } = await api.post(`/quick-actions/${qa.id}/run`);
+      setSession(data);
+      show(`Clocked in: ${qa.label}`, "success");
+    } catch (e) {
+      show("Could not start", "error");
+    }
+  }
+
+  async function stopNow() {
+    try {
+      await api.post("/time/clock-out", { description: "" });
+      setSession(null);
+      show("Saved time entry", "success");
+      loadSummary();
+    } catch { show("Could not clock out", "error"); }
+  }
 
   return (
     <>
@@ -54,6 +102,60 @@ export default function Dashboard() {
               <p className="text-ink-secondary">Sign in to save data, unlock Pro reports, and (when shipped) cloud sync.</p>
             </div>
           </div>
+        )}
+
+        {/* Active session banner */}
+        {session && (
+          <div data-testid="active-session-banner" className="card p-3 mb-3 flex items-center gap-3 border border-brand/30 bg-brand/10">
+            <div className="w-9 h-9 rounded-xl bg-brand flex items-center justify-center text-white animate-pulse">
+              <Play size={16} fill="currentColor" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-ink-primary truncate">
+                On the clock{session.description ? ` · ${session.description}` : ""}
+              </p>
+              <p className="text-xs text-brand-light font-semibold">
+                {fmtHours(durationHours(session.started_at_utc, isoNow()))}
+                <span className="hidden">{tickN}</span>
+              </p>
+            </div>
+            <button data-testid="active-session-stop" onClick={stopNow} className="btn btn-danger min-h-[40px] px-3">
+              <Square size={14} fill="currentColor" /> Stop
+            </button>
+          </div>
+        )}
+
+        {/* Quick actions */}
+        {!guest && quickActions.length > 0 && !session && (
+          <Section title="Quick actions">
+            <div className="p-3 grid grid-cols-3 gap-2">
+              {quickActions.slice(0, 6).map((qa) => {
+                const Ico = ICON_MAP[qa.icon] || Zap;
+                return (
+                  <button
+                    key={qa.id}
+                    data-testid={`quick-action-${qa.label.toLowerCase()}`}
+                    onClick={() => runQuick(qa)}
+                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-bg-elevated border border-strong hover:border-brand/40 active:scale-[0.97] transition min-h-[80px]"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-brand/15 text-brand flex items-center justify-center">
+                      <Ico size={16} />
+                    </div>
+                    <span className="text-xs font-semibold text-ink-primary truncate max-w-full">{qa.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="px-3 pb-3 -mt-1">
+              <button
+                data-testid="manage-quick-actions"
+                onClick={() => nav("/track")}
+                className="text-[11px] text-ink-tertiary hover:text-ink-secondary"
+              >
+                Manage on Track →
+              </button>
+            </div>
+          </Section>
         )}
 
         {/* scope */}
@@ -153,6 +255,7 @@ export default function Dashboard() {
           </>
         )}
       </PageContainer>
+      <Toast message={toast.message} kind={toast.kind} onDone={clear} />
     </>
   );
 }

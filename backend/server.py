@@ -280,6 +280,28 @@ async def _seed_default_business(user_id: str):
             "active_business_id": None,
             "updated_at": now_iso(),
         })
+    # Seed default quick actions, mapping by category name.
+    if await db.quick_actions.count_documents({"user_id": user_id}) == 0:
+        cats_by_name: dict = {}
+        async for c in db.categories.find({"user_id": user_id}, {"_id": 0, "id": 1, "name": 1}):
+            cats_by_name[c["name"]] = c["id"]
+        SEEDS = [
+            {"label": "Code", "category_name": "Coding", "default_description": "Development work", "icon": "Code"},
+            {"label": "Meeting", "category_name": "Meetings", "default_description": "Team / client meeting", "icon": "Users"},
+            {"label": "Review", "category_name": "Coding", "default_description": "Code review and feedback", "icon": "FileSearch"},
+        ]
+        await db.quick_actions.insert_many([
+            {
+                "id": new_id(), "user_id": user_id,
+                "label": s["label"],
+                "category_id": cats_by_name.get(s["category_name"]),
+                "default_description": s["default_description"],
+                "icon": s["icon"],
+                "sort_order": i,
+                "created_at": now_iso(), "updated_at": now_iso(),
+            }
+            for i, s in enumerate(SEEDS)
+        ])
 
 class CategoryIn(BaseModel):
     name: str
@@ -328,6 +350,55 @@ async def create_project(body: ProjectIn, current=Depends(get_current_user)):
 async def delete_project(pid: str, current=Depends(get_current_user)):
     await _delete("projects", current["id"], pid)
     return {"ok": True}
+
+# ---------------------------------------------------------------------------
+# Quick Actions — one-tap clock-in shortcuts (parity with desktop FACTORY_QUICK_ACTION_SEEDS)
+# ---------------------------------------------------------------------------
+
+class QuickActionIn(BaseModel):
+    label: str
+    category_id: Optional[str] = None
+    project_id: Optional[str] = None
+    default_description: Optional[str] = ""
+    icon: Optional[str] = "Zap"
+    sort_order: Optional[int] = 0
+
+@api.get("/quick-actions")
+async def list_quick_actions(current=Depends(get_current_user)):
+    cursor = db.quick_actions.find({"user_id": current["id"]}, {"_id": 0}).sort([("sort_order", 1), ("created_at", 1)])
+    return [d async for d in cursor]
+
+@api.post("/quick-actions")
+async def create_quick_action(body: QuickActionIn, current=Depends(get_current_user)):
+    return await _create("quick_actions", current["id"], body.model_dump())
+
+@api.patch("/quick-actions/{qid}")
+async def update_quick_action(qid: str, body: QuickActionIn, current=Depends(get_current_user)):
+    return await _update("quick_actions", current["id"], qid, body.model_dump())
+
+@api.delete("/quick-actions/{qid}")
+async def delete_quick_action(qid: str, current=Depends(get_current_user)):
+    await _delete("quick_actions", current["id"], qid)
+    return {"ok": True}
+
+@api.post("/quick-actions/{qid}/run")
+async def run_quick_action(qid: str, current=Depends(get_current_user)):
+    """One-tap: clock in (if not already) using this action's category/project/description."""
+    qa = await db.quick_actions.find_one({"id": qid, "user_id": current["id"]}, {"_id": 0})
+    if not qa:
+        raise HTTPException(status_code=404, detail="Quick action not found")
+    existing = await db.active_sessions.find_one({"user_id": current["id"]})
+    if existing:
+        raise HTTPException(status_code=409, detail="Already clocked in")
+    s = {
+        "user_id": current["id"], "active": True,
+        "category_id": qa.get("category_id"), "project_id": qa.get("project_id"),
+        "description": qa.get("default_description") or "",
+        "started_at_utc": now_iso(),
+        "started_via_quick_action_id": qa["id"],
+    }
+    await db.active_sessions.insert_one(dict(s))
+    return _strip(dict(s))
 
 # ---------------------------------------------------------------------------
 # Time entries + active session

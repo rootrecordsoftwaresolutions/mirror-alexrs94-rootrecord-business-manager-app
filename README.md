@@ -2,6 +2,10 @@
 
 Recovered from `Root.Record.Business.Manager-Setup-2.0.12.exe` (Inno Setup).
 
+## Export this product (zip / handoff / agent context)
+
+From this directory, run **`.\Export-BusinessManager.ps1`** (PowerShell). Defaults to a **Lean** copy on the Desktop (drops `node_modules`, build `output`, main `.exe`, and `.git`). See **`app/resources/app/docs/BM_EXPORT.md`** for profiles (**Lean** / **Fat** / **SourceOnly**) and the full reading list for tools like Emergent.
+
 ## Layout
 
 - **`app/`** — Directory install produced by a silent Inno run (treat as a portable install tree).

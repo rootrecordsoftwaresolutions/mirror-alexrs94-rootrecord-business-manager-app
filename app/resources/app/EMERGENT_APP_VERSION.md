@@ -2,6 +2,8 @@
 
 Work **only** under this folder: `app/resources/app/` (this file’s directory). Do not touch other repos, `credentials.env`, or unrelated projects.
 
+**Full tree / export / “what is this layout?”** → see **`docs/BM_EXPORT.md`**. **Export script:** from the folder that contains `Build-Installer.bat` (the `root-record-business-manager` directory), run **`.\Export-BusinessManager.ps1`** in PowerShell (from this file: `..\..\Export-BusinessManager.ps1`).
+
 ## 1. Version number
 
 - **Source of truth:** `package.json` → field **`version`** (semver, e.g. `2.0.12`).

@@ -2,7 +2,7 @@
 
 Desktop app for local business data, time tracking, and finance tools (**Electron** + **SQLite**) with online license sign-in. **Default install directory** (Inno Setup **`{autopf}\RootRecord\Business Manager`**): on a typical PC with Windows on **C:**, that is **`C:\Program Files\RootRecord\Business Manager`**. The drive and “Program Files” folder follow the machine (not hardcoded to **C:**). Main executable: **`RootRecordBusinessManager.exe`**. App data root: **`%USERPROFILE%\RootRecord\Business Manager`** (license/session JSON, device id, feedback queue). Business database and related files: **`%USERPROFILE%\RootRecord\Business Manager\business_data`** (SQLite, `machine_session.json`, `users\`, backups). Override with **`RR_BUSINESS_MANAGER_HOME`** or **`ROOTRECORD_HOME`**; **`SQLITE_PATH`** for a custom database file path.
 
-**Changelog:** [CHANGELOG.md](./CHANGELOG.md)
+**Changelog:** [CHANGELOG.md](./CHANGELOG.md) · **Export / full agent context:** [docs/BM_EXPORT.md](./docs/BM_EXPORT.md)
 
 ## Current release line: 2.x
 

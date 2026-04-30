@@ -31,6 +31,10 @@ Destination defaults to `Desktop\rootrecord-bm-export-<timestamp>`. Use `-Output
 
 See **`screenshots/`** in this `docs/` folder (`photo_*.jpg`) for visual context of the shipped app.
 
+## Android port (Weather-style)
+
+Extensive briefing + agent-ready prompt: **`ANDROID_PORT_MASTER_PROMPT.md`** in this folder.
+
 ## Reading order (maximum context, minimum thrash)
 
 1. **`../EMERGENT_APP_VERSION.md`** — version bump → build → optional GitHub release.

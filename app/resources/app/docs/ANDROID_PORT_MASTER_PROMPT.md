@@ -4,6 +4,30 @@ Use this document as the **single briefing** for an AI agent or engineering team
 
 ---
 
+## Canonical GitHub repositories (Weather + Business Manager)
+
+**Weather Manager — Android (private application source)**  
+**https://github.com/RootRecord/rr-weather-manager-mobile**  
+This is the real mobile codebase (React + Capacitor, `frontend/`, `backend/`, Gradle, docs). Clone or browse **this** repo for implementation patterns—not a guess from folder names alone.
+
+**Weather Manager — Android (public: APK, changelog, consumer README only — no app source)**  
+**https://github.com/RootRecord/rootrecord-weather-manager-mobile**  
+Releases: **https://github.com/RootRecord/rootrecord-weather-manager-mobile/releases**  
+Maintainers sync the minimal public tree from the sibling **`rootrecord-weather-manager-mobile-public`** folder in automation/docs; never push full source there.
+
+**Weather Manager — Windows desktop installers (public)**  
+**https://github.com/RootRecord/rootrecord-weather-manager-download** (installers / `latest.yml` for the Electron desktop app—not the Android repo).
+
+**Business Manager — Windows / Electron app snapshot (private; BM-only tree)**  
+**https://github.com/RootRecord/rootrecord-business-manager-app**  
+Contains this `app/resources/app/` tree, export script, screenshots, and **this** Android port prompt.
+
+**Full RootRecord workspace (optional; large monorepo)**  
+**https://github.com/RootRecord/rootrecord-workspace**  
+May include a **local checkout** under `Mobile App Development/rr-weather-manager-mobile/` that **tracks** `rr-weather-manager-mobile`—but agents should still use the **GitHub URLs above** as source of truth.
+
+---
+
 ## 0. North star
 
 Deliver **RootRecord Business Manager on Android**: **local-first** business data (time, money, clients, inventory, scheduling, reports), **SQLite** on device, **optional** online features where they exist on desktop (license sign-in, entitlement refresh, sync/backup if the product defines them), and **RootRecord account** alignment with **`rootrecord.info`** and the existing **Cloudflare license / primary** APIs.
@@ -12,7 +36,7 @@ Match **Weather Manager mobile** in **process**, not necessarily in stack line-f
 
 | Dimension | Weather Manager (Android) reference | Business Manager (current) |
 |-----------|-------------------------------------|------------------------------|
-| Public vs private | **Public** repo: installables + changelog only (`rootrecord-weather-manager-mobile`). **Private** repo: React + Capacitor + scripts. | Mirror: public “storefront” repo for APK/AAB + notes; private repo for source. |
+| Public vs private | **Private source:** [rr-weather-manager-mobile](https://github.com/RootRecord/rr-weather-manager-mobile). **Public storefront:** [rootrecord-weather-manager-mobile](https://github.com/RootRecord/rootrecord-weather-manager-mobile) (Releases only). | Mirror: **private** `rr-business-manager-mobile` (TBD) + **public** `rootrecord-business-manager-mobile` (TBD) for APK/AAB + notes. |
 | Client | **React** app + **Capacitor 6** (`frontend/`), Gradle under `frontend/android/`. | Plan a **mobile client** (recommended: **React + Capacitor** or **Kotlin + Compose** with a shared logic layer—decide in §3). |
 | Workspace | Sits under **`Mobile App Development`** with **pnpm** workspace, `pnpm weather:start`. | New package e.g. `pnpm business:start` or sibling app under same workspace. |
 | Backend | Optional **FastAPI** + Mongo for some features; client talks HTTP. | **Reuse** existing **license Worker** + **primary Worker** HTTP APIs where desktop does; **no** requirement to duplicate Windows-only paths. |
@@ -23,7 +47,8 @@ Match **Weather Manager mobile** in **process**, not necessarily in stack line-f
 ## 1. Source of truth (read in this order)
 
 1. **Windows / Electron app (canonical behavior)**  
-   Repo path (monorepo): `Windows App Development/apps/root-record-business-manager/`  
+   **GitHub (BM-only snapshot):** [rootrecord-business-manager-app](https://github.com/RootRecord/rootrecord-business-manager-app)  
+   Monorepo path (if you have the full workspace): `Windows App Development/apps/root-record-business-manager/`  
    Dev root: **`app/resources/app/`** — `package.json`, `src/main/**`, `src/renderer/**`, `src/main/licenseService.js`, `src/main/database.js`, `src/main/paths.js`, `src/main/syncEngine.js` (if present).
 
 2. **Product + data model docs**  
@@ -32,10 +57,11 @@ Match **Weather Manager mobile** in **process**, not necessarily in stack line-f
    - `app/resources/app/docs/BM_EXPORT.md` — layout, export script, reading order.  
    - `app/resources/app/docs/screenshots/` — UI reference.
 
-3. **Weather Manager mobile (process template)**  
-   Private tree: `Mobile App Development/rr-weather-manager-mobile/README.md`  
-   Docs: `Mobile App Development/rr-weather-manager-mobile/docs/PORTING-AND-INTEGRATION.md`, `SECURITY-AND-SECRETS.md`  
-   Public mirror pattern: `Mobile App Development/rootrecord-weather-manager-mobile-public/`
+3. **Weather Manager mobile (process + code template)**  
+   **Clone and read:** [https://github.com/RootRecord/rr-weather-manager-mobile](https://github.com/RootRecord/rr-weather-manager-mobile)  
+   Entry: **`README.md`** (pnpm workspace, `pnpm weather:start`, Capacitor, `frontend/android/`, `pnpm run android:play:ready`).  
+   Docs: **`docs/PORTING-AND-INTEGRATION.md`**, **`docs/SECURITY-AND-SECRETS.md`** in that repo.  
+   **Public** sibling workflow: [rootrecord-weather-manager-mobile](https://github.com/RootRecord/rootrecord-weather-manager-mobile) — compare with local **`Mobile App Development/rootrecord-weather-manager-mobile-public/`** only if you maintain that mirror from the monorepo.
 
 4. **APIs and site alignment**  
    - Account portal pattern: **`https://rootrecord.info`** same-origin `/v1/*` via Pages (see main site).  
@@ -161,9 +187,10 @@ Unless product owner removes these:
 You are implementing RootRecord Business Manager for Android.
 
 Constraints:
-- Read docs under Windows App Development/apps/root-record-business-manager/app/resources/app/ (README, docs/BM_EXPORT, docs/screenshots, licenseService.js, database paths).
-- Mirror the Weather Manager mobile process: private source repo + public releases repo; React+Capacitor unless ADR says otherwise.
-- Reuse existing Cloudflare APIs: license + primary workers; same URLs as rootrecord-sites-reference.env for non-secret values.
+- Study the existing Android reference implementation (clone): https://github.com/RootRecord/rr-weather-manager-mobile — README, docs/, Capacitor frontend, Android Gradle, release flow. Public APK home (no source): https://github.com/RootRecord/rootrecord-weather-manager-mobile/releases
+- Read Business Manager desktop behavior: https://github.com/RootRecord/rootrecord-business-manager-app — app/resources/app/ (README, docs/BM_EXPORT, docs/screenshots, licenseService.js, database paths).
+- Mirror Weather’s process: private mobile source repo + public releases-only repo; React+Capacitor unless ADR says otherwise.
+- Reuse existing Cloudflare APIs: license + primary workers; same URLs as rootrecord-sites-reference.env (monorepo) for non-secret values.
 - Local-first SQLite on device; no new server-side product DB without an approved design.
 
 Deliver: ADR, repo layout, schema port plan, licence client module, first vertical slice UI, CI debug APK, and public-repo release notes template.

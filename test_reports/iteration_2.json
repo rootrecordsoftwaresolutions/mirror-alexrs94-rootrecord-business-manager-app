@@ -1,0 +1,43 @@
+{
+  "summary": "Validated licence-Worker-proxy auth rewrite via pytest against the live Cloudflare Worker. 15/16 tests passed. All register/login/me/entitlement/logout/CORS/token-cache/seed-data/isolation/quick-action/clock-out flows work. The single failure is an upstream Cloudflare Worker bug (error 1102 'Worker exceeded resource limits') on the 'existing email + wrong password' code path — the Worker crashes before returning 401. Our proxy faithfully propagates the upstream 5xx, so this is NOT a regression in /app/backend/server.py.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/auth/login (wrong password for real account)",
+        "issue": "Upstream licence Worker returns HTML 5xx (Cloudflare error 1102 'Worker exceeded resource limits') instead of 401. Reproducible: register fresh account, then login with wrong password -> 502 with full Cloudflare HTML page in detail. Non-existent-email + bad password works (401). Issue is in the Worker, not our proxy."
+      },
+      {
+        "endpoint": "_worker_post / _worker_get in server.py",
+        "issue": "When the Worker returns HTML (e.g. Cloudflare error page), _worker_error() falls back to dumping r.text verbatim into `detail`. Clients receive a ~4KB HTML blob as the error message. Recommend: detect non-JSON / HTML responses and replace with a short message like 'Licence service is temporarily unavailable.' while still logging r.text server-side."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_auth_worker_proxy.py",
+    "/app/test_reports/pytest/pytest_auth_worker.xml"
+  ],
+  "action_items": [
+    "Upstream: investigate Cloudflare Worker 1102 on login-with-wrong-password for existing accounts. Check Worker logs (rootrecord-license.rootrecord.workers.dev) for the exception. Likely an unhandled throw in the password-mismatch branch that is causing the isolate to exceed limits (CPU or memory loop) instead of cleanly returning 401.",
+    "Minor: in backend/server.py _worker_post/_worker_get, sanitize non-JSON responses before surfacing them as HTTPException.detail (strip HTML, cap length, default to a short user-facing message).",
+    "Minor: /app/backend/.env still contains legacy ADMIN_EMAIL, ADMIN_PASSWORD, JWT_SECRET vars that are no longer used after the Worker-proxy rewrite. Safe to delete to avoid confusion."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1167 lines in a single module. Recommend splitting into routers/ (auth.py, time.py, money.py, clients.py, inventory.py, settings.py, dashboard.py) and a services/licence.py for the Worker proxy.",
+    "_TOKEN_CACHE is a process-local dict with no size bound. If the backend runs multiple workers or the process lives long enough, cache never evicts expired entries (only lazy expire on hit). Add periodic pruning or use a bounded LRU (cachetools.TTLCache).",
+    "get_current_user does a DB upsert (_ensure_user_seeded) on every single authenticated request, even though the token cache exists specifically to avoid per-request round trips. Consider caching the seeded user doc alongside the token (token -> user dict) so the happy path is pure in-memory.",
+    "_ensure_user_seeded auto-calls _seed_default_business whenever businesses.count == 0, which silently re-seeds if the user intentionally deleted their last business. Consider gating on a users.seeded=true flag instead.",
+    "Error propagation: _worker_post swallows the Worker's status code when it isn't in (400,401,403,409) and returns 502, masking e.g. 429 rate-limit. Pass through 429 explicitly so the frontend can back off."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_worker_proxy.py (new — 16 pytest cases covering the Worker-proxy contract)"
+  ],
+  "success_rate": {"backend": "94% (15/16; the 1 failure is an upstream Cloudflare Worker crash, not our code)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "Tests generate fresh emails per run: bm-<tag>-<runid>-<rand>@rootrecord-test.com / TestPass1234! . Worker rejects .test / .local TLDs so .com is used. No fixed credentials required.",
+  "seed_data_creation": "Each test run registers ~3 fresh accounts against the LIVE Worker (account_a fixture + test_logout_best_effort_ok + test_isolation_between_two_accounts). These accounts persist on the Worker side — acceptable per request note. Local Mongo seeds (12 categories, 1 business, default quick actions, settings) were verified to be created automatically on first /auth/me.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Auth is now a pure proxy to https://rootrecord-license.rootrecord.workers.dev. Don't try admin@rootrecord.app/admin123 — it's gone. Generate unique emails per run. The Worker has an upstream 1102 crash on wrong-password-for-existing-account; if you see 502 with HTML in detail, that's the same Cloudflare error and not a regression. pytest file: /app/backend/tests/test_auth_worker_proxy.py.",
+  "rca of the issue": "Failure: POST /api/auth/login with correct-email+wrong-password returns 502 instead of 401. Reproduction: (1) POST /api/auth/register with fresh email -> 200 + token. (2) POST /api/auth/login with same email + wrong password -> 502 with HTML body 'Worker exceeded resource limits' (Cloudflare error 1102, Ray IDs 9f43dba59e25b78e, 9f43dc4e5dd8123f). Root cause: upstream Cloudflare Worker at rootrecord-license.rootrecord.workers.dev is crashing on its /v1/auth/login password-mismatch branch (exceeds CPU/memory isolate limits). Our FastAPI proxy (_worker_post) correctly receives the 5xx + HTML and surfaces status 502. Mitigation: (a) investigate Worker logs for exception on wrong-password path; (b) in the meantime, _worker_post should map upstream HTML 5xx bodies to a short user-facing message ('Sign-in service is temporarily unavailable — try again in a moment.') rather than forwarding the raw Cloudflare HTML. Non-existent-email+bad-password works fine (returns clean 401), so the bug is specifically in the 'account exists, verify password' branch of the Worker."
+}

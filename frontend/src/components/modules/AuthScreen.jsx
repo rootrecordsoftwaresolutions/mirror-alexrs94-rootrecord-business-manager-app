@@ -43,8 +43,8 @@ export default function AuthScreen() {
         </div>
         <h1 className="font-heading text-2xl font-bold text-ink-primary tracking-tight">RootRecord</h1>
         <p className="text-xs text-ink-secondary mt-1">Business Manager</p>
-        <p className="text-xs text-ink-tertiary mt-3 text-center max-w-[280px]">
-          Your grounding root for business productivity. Local-first time, money, and clients on every device.
+        <p className="text-xs text-ink-tertiary mt-3 text-center max-w-[300px]">
+          Use the same email and password as your Windows installer. Your account, plan, and sync follow you across every device.
         </p>
       </div>
 
@@ -132,7 +132,7 @@ export default function AuthScreen() {
       </button>
 
       <p className="text-xs text-ink-tertiary text-center mt-auto pt-6">
-        Your data stays on your device. Sign in to enable cloud sync (planned) and Pro reports.
+        Powered by the RootRecord licence Worker — same account, same email/password, every device.
       </p>
     </div>
   );

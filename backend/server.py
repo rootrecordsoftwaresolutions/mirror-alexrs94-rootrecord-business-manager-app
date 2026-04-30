@@ -1,21 +1,21 @@
 """RootRecord Business Manager — Mobile API.
 
 Local-first parity with the desktop Electron + SQLite app: time, money, clients,
-inventory, scheduling. JWT auth (custom email/password) for the cloud preview;
-the same data shapes are designed to drop into Capacitor + sqlite-mobile later.
+inventory, scheduling. Auth proxies to the RootRecord licence Worker so the same
+email/password used by the Windows desktop app works on mobile.
 """
 
 from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import time
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional, List, Any
 
-import bcrypt
-import jwt
-from fastapi import FastAPI, HTTPException, Depends, Request, Response, APIRouter
+import httpx
+from fastapi import FastAPI, HTTPException, Depends, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
@@ -26,14 +26,13 @@ from pydantic import BaseModel, EmailStr, Field
 
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
-JWT_SECRET = os.environ["JWT_SECRET"]
-JWT_ALG = "HS256"
-ACCESS_TTL_MIN = 60 * 24 * 7  # 7 days for mobile convenience
+LICENSE_API_BASE_URL = os.environ.get("LICENSE_API_BASE_URL", "").rstrip("/")
+LOCAL_AUTH_FALLBACK = LICENSE_API_BASE_URL in ("", "local")
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-app = FastAPI(title="RootRecord Business Manager — Mobile API", version="0.1.0")
+app = FastAPI(title="RootRecord Business Manager — Mobile API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,6 +44,11 @@ app.add_middleware(
 
 api = APIRouter(prefix="/api")
 
+# In-memory cache of validated bearer tokens to avoid hammering the Worker on every API call.
+# Stores token -> (account_id, email, expires_at_epoch).
+_TOKEN_CACHE: dict = {}
+_TOKEN_TTL_SEC = 300  # 5 minutes
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -55,24 +59,112 @@ def now_iso() -> str:
 def new_id() -> str:
     return uuid.uuid4().hex
 
-def hash_password(p: str) -> str:
-    return bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()
+# ---------------------------------------------------------------------------
+# Licence Worker proxy (RootRecord licence service)
+# ---------------------------------------------------------------------------
+# Worker base: https://rootrecord-license.rootrecord.workers.dev
+# Endpoints used: /v1/auth/login, /v1/auth/signup, /v1/auth/logout, /v1/me, /v1/entitlement
+# Mirrors the desktop app's licenseService.js HTTP contract.
 
-def verify_password(p: str, h: str) -> bool:
+async def _worker_post(path: str, body: dict, bearer: Optional[str] = None) -> tuple[int, dict]:
+    if not LICENSE_API_BASE_URL:
+        raise HTTPException(status_code=503, detail="Online sign-in is not configured.")
+    headers = {"Content-Type": "application/json"}
+    if bearer:
+        headers["Authorization"] = f"Bearer {bearer}"
+    url = f"{LICENSE_API_BASE_URL}{path}"
+    async with httpx.AsyncClient(timeout=httpx.Timeout(35.0)) as cx:
+        try:
+            r = await cx.post(url, json=body, headers=headers)
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"Licence service unreachable: {e}")
     try:
-        return bcrypt.checkpw(p.encode(), h.encode())
+        data = r.json()
     except Exception:
-        return False
+        data = {"detail": r.text or f"HTTP {r.status_code}"}
+    return r.status_code, data
 
-def make_token(user_id: str, email: str) -> str:
-    payload = {
-        "sub": user_id,
+async def _worker_get(path: str, bearer: str) -> tuple[int, dict]:
+    if not LICENSE_API_BASE_URL:
+        raise HTTPException(status_code=503, detail="Online sign-in is not configured.")
+    url = f"{LICENSE_API_BASE_URL}{path}"
+    async with httpx.AsyncClient(timeout=httpx.Timeout(22.0)) as cx:
+        try:
+            r = await cx.get(url, headers={"Authorization": f"Bearer {bearer}"})
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"Licence service unreachable: {e}")
+    try:
+        data = r.json()
+    except Exception:
+        data = {"detail": r.text or f"HTTP {r.status_code}"}
+    return r.status_code, data
+
+def _worker_error(status: int, body: dict) -> str:
+    if isinstance(body, dict):
+        for k in ("detail", "message", "error"):
+            v = body.get(k)
+            if isinstance(v, str) and v:
+                return v
+            if isinstance(v, dict):
+                m = v.get("message") or v.get("code") or v.get("detail")
+                if m:
+                    return str(m)
+    return f"Licence service returned HTTP {status}."
+
+def _plan_from_entitlement(ent: dict) -> str:
+    """access=full + reason=paid → pro; otherwise free."""
+    access = str(ent.get("access") or "").lower()
+    reason = str(ent.get("reason") or "").lower()
+    sub = str(ent.get("subscription_status") or "").lower()
+    if access == "full" and (reason == "paid" or sub == "active"):
+        return "pro"
+    return "free"
+
+async def _ensure_user_seeded(account_id: str, email: str) -> dict:
+    """Create a local mirror of the licence account so we can scope owned data."""
+    u = await db.users.find_one({"id": account_id}, {"_id": 0})
+    if u:
+        # keep email + last_seen current
+        await db.users.update_one(
+            {"id": account_id},
+            {"$set": {"email": email, "last_seen": now_iso()}},
+        )
+        u = await db.users.find_one({"id": account_id}, {"_id": 0})
+        # First-run safety: if for any reason this account has no business, seed it.
+        if await db.businesses.count_documents({"user_id": account_id}) == 0:
+            await _seed_default_business(account_id)
+        return u
+    doc = {
+        "id": account_id,
         "email": email,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TTL_MIN),
-        "iat": datetime.now(timezone.utc),
-        "type": "access",
+        "name": email.split("@")[0],
+        "role": "user",
+        "plan": "free",
+        "created_at": now_iso(),
+        "last_seen": now_iso(),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+    await db.users.insert_one(dict(doc))
+    await _seed_default_business(account_id)
+    return doc
+
+async def _validate_token(token: str) -> dict:
+    """Validate via Worker /v1/me with a 5-minute in-memory cache."""
+    cached = _TOKEN_CACHE.get(token)
+    if cached and cached[2] > time.time():
+        account_id, email, _ = cached
+        return {"id": account_id, "email": email}
+    status, body = await _worker_get("/v1/me", token)
+    if status == 401:
+        _TOKEN_CACHE.pop(token, None)
+        raise HTTPException(status_code=401, detail="Session expired. Sign in again.")
+    if status >= 400:
+        raise HTTPException(status_code=502, detail=_worker_error(status, body))
+    account_id = str(body.get("account_id") or "")
+    email = str(body.get("email") or "").lower()
+    if not account_id:
+        raise HTTPException(status_code=502, detail="Licence service returned no account_id.")
+    _TOKEN_CACHE[token] = (account_id, email, time.time() + _TOKEN_TTL_SEC)
+    return {"id": account_id, "email": email, "subscription_status": body.get("subscription_status"), "has_password": body.get("has_password")}
 
 async def get_current_user(request: Request) -> dict:
     auth = request.headers.get("Authorization", "")
@@ -81,15 +173,9 @@ async def get_current_user(request: Request) -> dict:
         token = auth[7:].strip()
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+    info = await _validate_token(token)
+    user = await _ensure_user_seeded(info["id"], info["email"])
+    user["_token"] = token  # available for endpoints that need to forward the bearer
     return user
 
 # ---------------------------------------------------------------------------
@@ -100,10 +186,12 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
     name: Optional[str] = None
+    device_id: Optional[str] = None
 
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    device_id: Optional[str] = None
 
 class UserOut(BaseModel):
     id: str
@@ -112,69 +200,145 @@ class UserOut(BaseModel):
     plan: str = "free"  # free | pro
     role: str = "user"
     created_at: str
+    subscription_status: Optional[str] = None
+    valid_until: Optional[str] = None
 
 class AuthOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
 
-async def _public_user(u: dict) -> UserOut:
-    return UserOut(
-        id=u["id"],
-        email=u["email"],
-        name=u.get("name", ""),
-        plan=u.get("plan", "free"),
-        role=u.get("role", "user"),
-        created_at=u.get("created_at", now_iso()),
+def _device_id(value: Optional[str]) -> str:
+    v = (value or "").strip()
+    return v if len(v) >= 8 else str(uuid.uuid4())
+
+@api.post("/auth/login", response_model=AuthOut)
+async def login(body: LoginIn):
+    """Proxies to the RootRecord licence Worker so the same email/password used by the
+    Windows desktop installer works on mobile."""
+    email = body.email.lower().strip()
+    device_id = _device_id(body.device_id)
+    status, body_resp = await _worker_post("/v1/auth/login", {
+        "email": email, "password": body.password, "device_id": device_id,
+    })
+    if status >= 400:
+        # Map worker error strings into the messages the desktop app uses.
+        msg = _worker_error(status, body_resp)
+        raise HTTPException(status_code=status if status in (400, 401, 403, 409) else 502, detail=msg)
+    token = str(body_resp.get("access_token") or "").strip()
+    if not token:
+        raise HTTPException(status_code=502, detail="Licence service did not return a token.")
+    # Resolve user identity
+    me_status, me_body = await _worker_get("/v1/me", token)
+    if me_status >= 400:
+        raise HTTPException(status_code=me_status, detail=_worker_error(me_status, me_body))
+    account_id = str(me_body.get("account_id") or body_resp.get("account_id") or "")
+    if not account_id:
+        raise HTTPException(status_code=502, detail="Licence service returned no account_id.")
+    u = await _ensure_user_seeded(account_id, email)
+    plan = _plan_from_entitlement(body_resp)
+    if plan != u.get("plan"):
+        await db.users.update_one({"id": account_id}, {"$set": {"plan": plan}})
+        u["plan"] = plan
+    _TOKEN_CACHE[token] = (account_id, email, time.time() + _TOKEN_TTL_SEC)
+    return AuthOut(
+        access_token=token,
+        user=UserOut(
+            id=account_id,
+            email=email,
+            name=u.get("name", email.split("@")[0]),
+            plan=plan,
+            role=u.get("role", "user"),
+            created_at=u.get("created_at", now_iso()),
+            subscription_status=me_body.get("subscription_status") or body_resp.get("subscription_status"),
+            valid_until=body_resp.get("valid_until"),
+        ),
     )
 
 @api.post("/auth/register", response_model=AuthOut)
 async def register(body: RegisterIn):
+    """Proxies to the licence Worker /v1/auth/signup."""
     email = body.email.lower().strip()
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=409, detail="Email already registered")
-    user_id = new_id()
-    doc = {
-        "id": user_id,
-        "email": email,
-        "name": body.name or email.split("@")[0],
-        "password_hash": hash_password(body.password),
-        "plan": "free",
-        "role": "user",
-        "created_at": now_iso(),
-    }
-    await db.users.insert_one(doc)
-    # Seed default business
-    await _seed_default_business(user_id)
-    user = await _public_user(doc)
-    token = make_token(user_id, email)
-    return AuthOut(access_token=token, user=user)
-
-@api.post("/auth/login", response_model=AuthOut)
-async def login(body: LoginIn):
-    email = body.email.lower().strip()
-    u = await db.users.find_one({"email": email})
-    if not u or not verify_password(body.password, u["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    user = await _public_user(u)
-    token = make_token(u["id"], email)
-    return AuthOut(access_token=token, user=user)
+    device_id = _device_id(body.device_id)
+    status, body_resp = await _worker_post("/v1/auth/signup", {
+        "email": email, "password": body.password, "device_id": device_id,
+    })
+    if status >= 400:
+        msg = _worker_error(status, body_resp)
+        raise HTTPException(status_code=status if status in (400, 401, 403, 409) else 502, detail=msg)
+    token = str(body_resp.get("access_token") or "").strip()
+    if not token:
+        raise HTTPException(status_code=502, detail="Licence service did not return a token.")
+    me_status, me_body = await _worker_get("/v1/me", token)
+    if me_status >= 400:
+        raise HTTPException(status_code=me_status, detail=_worker_error(me_status, me_body))
+    account_id = str(me_body.get("account_id") or body_resp.get("account_id") or "")
+    if not account_id:
+        raise HTTPException(status_code=502, detail="Licence service returned no account_id.")
+    u = await _ensure_user_seeded(account_id, email)
+    if body.name:
+        await db.users.update_one({"id": account_id}, {"$set": {"name": body.name}})
+        u["name"] = body.name
+    plan = _plan_from_entitlement(body_resp)
+    _TOKEN_CACHE[token] = (account_id, email, time.time() + _TOKEN_TTL_SEC)
+    return AuthOut(
+        access_token=token,
+        user=UserOut(
+            id=account_id, email=email, name=u.get("name", email.split("@")[0]),
+            plan=plan, role=u.get("role", "user"),
+            created_at=u.get("created_at", now_iso()),
+            subscription_status=me_body.get("subscription_status"),
+            valid_until=body_resp.get("valid_until"),
+        ),
+    )
 
 @api.get("/auth/me", response_model=UserOut)
 async def me(current=Depends(get_current_user)):
-    return UserOut(**current)
+    return UserOut(
+        id=current["id"], email=current["email"], name=current.get("name", ""),
+        plan=current.get("plan", "free"), role=current.get("role", "user"),
+        created_at=current.get("created_at", now_iso()),
+        subscription_status=current.get("subscription_status"),
+    )
 
 @api.post("/auth/logout")
 async def logout(current=Depends(get_current_user)):
+    token = current.get("_token", "")
+    _TOKEN_CACHE.pop(token, None)
+    if token and LICENSE_API_BASE_URL:
+        try:
+            await _worker_post("/v1/auth/logout", {}, bearer=token)
+        except Exception:
+            pass  # best effort
     return {"ok": True}
 
-@api.post("/auth/upgrade-pro")
-async def upgrade_pro(current=Depends(get_current_user)):
-    """Demo endpoint to flip a user to Pro plan. In production this would be wired
-    to the RootRecord licence Worker entitlement flow."""
-    await db.users.update_one({"id": current["id"]}, {"$set": {"plan": "pro"}})
-    return {"ok": True, "plan": "pro"}
+class EntitlementIn(BaseModel):
+    device_id: Optional[str] = None
+
+@api.post("/auth/entitlement")
+async def refresh_entitlement(body: EntitlementIn, current=Depends(get_current_user)):
+    """Force a fresh entitlement check against the licence Worker.
+    Mirrors desktop's `licensePrepare({forceRefresh: true})` from licenseService.js."""
+    token = current.get("_token", "")
+    device_id = _device_id(body.device_id)
+    status, body_resp = await _worker_post("/v1/entitlement", {
+        "email": current["email"], "device_id": device_id,
+    }, bearer=token)
+    if status >= 400:
+        raise HTTPException(status_code=status if status in (400, 401, 403) else 502, detail=_worker_error(status, body_resp))
+    plan = _plan_from_entitlement(body_resp)
+    await db.users.update_one(
+        {"id": current["id"]},
+        {"$set": {"plan": plan, "last_entitlement_check_utc": now_iso()}},
+    )
+    return {
+        "ok": True,
+        "plan": plan,
+        "access": body_resp.get("access"),
+        "reason": body_resp.get("reason"),
+        "valid_until": body_resp.get("valid_until"),
+        "subscription_status": body_resp.get("subscription_status"),
+    }
 
 # ---------------------------------------------------------------------------
 # Generic CRUD factory for owned collections
@@ -980,25 +1144,23 @@ async def health():
 
 @app.on_event("startup")
 async def on_startup():
-    await db.users.create_index("email", unique=True)
+    # email index but NOT unique anymore — accounts can re-appear with same id, and the
+    # canonical id field is `id` (= licence Worker account_id).
+    await db.users.create_index("id", unique=True)
+    await db.users.create_index("email")
     await db.time_entries.create_index([("user_id", 1), ("start_utc", -1)])
     await db.income_entries.create_index([("user_id", 1), ("received_at_utc", -1)])
     await db.expense_entries.create_index([("user_id", 1), ("spent_at_utc", -1)])
     await db.schedule_events.create_index([("user_id", 1), ("starts_at_utc", -1)])
-
-    # Seed admin
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@rootrecord.local").lower()
-    admin_pw = os.environ.get("ADMIN_PASSWORD", "admin123")
-    existing = await db.users.find_one({"email": admin_email})
-    if not existing:
-        admin_id = new_id()
-        await db.users.insert_one({
-            "id": admin_id, "email": admin_email, "name": "Admin",
-            "password_hash": hash_password(admin_pw),
-            "plan": "pro", "role": "admin", "created_at": now_iso(),
-        })
-        await _seed_default_business(admin_id)
-    elif not verify_password(admin_pw, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_pw)}})
+    # Drop legacy unique index on email if present (carried from local-auth build).
+    try:
+        await db.users.drop_index("email_1")
+    except Exception:
+        pass
+    # Drop any local-only password fields from prior local-auth installs.
+    try:
+        await db.users.update_many({}, {"$unset": {"password_hash": ""}})
+    except Exception:
+        pass
 
 app.include_router(api)

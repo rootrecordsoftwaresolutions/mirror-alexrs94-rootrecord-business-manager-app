@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { api, getToken, setToken } from "../lib/api";
+import { api, getToken, setToken, getDeviceId } from "../lib/api";
 
 const AuthCtx = createContext(null);
 
@@ -32,7 +32,9 @@ export function AuthProvider({ children }) {
   }, [guest, refresh]);
 
   const login = useCallback(async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
+    const { data } = await api.post("/auth/login", {
+      email, password, device_id: getDeviceId(),
+    });
     setToken(data.access_token);
     localStorage.removeItem("rrbm_guest");
     setGuest(false);
@@ -41,7 +43,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   const register = useCallback(async (email, password, name) => {
-    const { data } = await api.post("/auth/register", { email, password, name });
+    const { data } = await api.post("/auth/register", {
+      email, password, name, device_id: getDeviceId(),
+    });
     setToken(data.access_token);
     localStorage.removeItem("rrbm_guest");
     setGuest(false);
@@ -59,6 +63,16 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const refreshEntitlement = useCallback(async () => {
+    try {
+      const { data } = await api.post("/auth/entitlement", { device_id: getDeviceId() });
+      setUser((u) => (u ? { ...u, plan: data.plan, subscription_status: data.subscription_status } : u));
+      return data;
+    } catch (e) {
+      throw e;
+    }
+  }, []);
+
   const continueAsGuest = useCallback(() => {
     localStorage.setItem("rrbm_guest", "1");
     setGuest(true);
@@ -72,7 +86,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthCtx.Provider
-      value={{ user, guest, login, register, logout, continueAsGuest, exitGuest, refresh }}
+      value={{ user, guest, login, register, logout, continueAsGuest, exitGuest, refresh, refreshEntitlement }}
     >
       {children}
     </AuthCtx.Provider>

@@ -6,17 +6,24 @@ import { Sparkles, LogOut, LogIn } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export function AccountSettings() {
-  const { user, guest, logout, exitGuest } = useAuth();
+  const { user, guest, logout, exitGuest, refreshEntitlement } = useAuth();
   const nav = useNavigate();
   const { toast, show, clear } = useToast();
+  const [busy, setBusy] = useState(false);
+  const [ent, setEnt] = useState(null);
   const isPro = user?.plan === "pro";
 
-  async function upgrade() {
+  async function refresh() {
+    setBusy(true);
     try {
-      await api.post("/auth/upgrade-pro");
-      show("You're Pro now!", "success");
-      setTimeout(() => window.location.reload(), 700);
-    } catch { show("Could not upgrade", "error"); }
+      const data = await refreshEntitlement();
+      setEnt(data);
+      show(data.plan === "pro" ? "Pro confirmed" : "Plan refreshed", "success");
+    } catch (e) {
+      show("Could not refresh — try again later", "error");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -31,7 +38,7 @@ export function AccountSettings() {
                   <span className="text-sm text-ink-secondary">Signed in as</span>
                   <span data-testid="account-email" className="text-sm font-semibold">{user.email}</span>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-3">
                   <span className="text-sm text-ink-secondary">Membership</span>
                   {isPro ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-brand/15 border border-brand/30 text-brand-light">
@@ -39,9 +46,27 @@ export function AccountSettings() {
                     </span>
                   ) : <span className="chip">Free</span>}
                 </div>
-                <button data-testid="account-logout-btn" onClick={async () => { await logout(); nav("/auth"); }} className="btn btn-secondary w-full mt-4">
+                {(user.subscription_status || ent?.subscription_status) && (
+                  <div className="flex justify-between mb-3">
+                    <span className="text-sm text-ink-secondary">Subscription</span>
+                    <span className="text-sm font-semibold capitalize">{ent?.subscription_status || user.subscription_status}</span>
+                  </div>
+                )}
+                {ent?.valid_until && (
+                  <div className="flex justify-between mb-3">
+                    <span className="text-sm text-ink-secondary">Valid until</span>
+                    <span className="text-sm font-semibold">{new Date(ent.valid_until).toLocaleString()}</span>
+                  </div>
+                )}
+                <button data-testid="account-refresh-btn" onClick={refresh} disabled={busy} className="btn btn-primary w-full mb-2">
+                  {busy ? "Checking…" : "Refresh entitlement"}
+                </button>
+                <button data-testid="account-logout-btn" onClick={async () => { await logout(); nav("/auth"); }} className="btn btn-secondary w-full">
                   <LogOut size={16} /> Log out
                 </button>
+                <p className="text-[11px] text-ink-tertiary mt-3 text-center">
+                  Same email/password as the Windows desktop app · device-bound via licence Worker.
+                </p>
               </>
             ) : (
               <>
@@ -75,17 +100,23 @@ export function AccountSettings() {
           </div>
           {user && !isPro && (
             <div className="px-4 pb-4">
-              <button data-testid="upgrade-pro-btn" onClick={upgrade} className="btn btn-primary w-full">
-                <Sparkles size={16} /> Upgrade to Pro
-              </button>
-              <p className="text-[10px] text-ink-tertiary text-center mt-2">Demo upgrade — production wires to RootRecord licence Worker.</p>
+              <a
+                data-testid="upgrade-pro-link"
+                href="https://rootrecord.info"
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary w-full"
+              >
+                <Sparkles size={16} /> Upgrade on rootrecord.info
+              </a>
+              <p className="text-[10px] text-ink-tertiary text-center mt-2">After paying, tap "Refresh entitlement" above.</p>
             </div>
           )}
         </Section>
 
         <Section title="Cloud sync">
           <div className="p-4 text-sm text-ink-secondary">
-            <p>When you're signed in, your data is queued for cloud sync. Production deployment uses the RootRecord licence Worker (<code className="text-xs">/v1/sync/push</code> & <code className="text-xs">/v1/sync/pull</code>).</p>
+            <p>You're authenticated with the same RootRecord licence Worker the Windows desktop app uses, so your email/password works on both. Cloud data sync (push/pull of business records) is the next milestone — wire-up will reuse your existing token.</p>
             <button disabled className="btn btn-secondary w-full mt-3 opacity-60">Sync with cloud (planned)</button>
           </div>
         </Section>

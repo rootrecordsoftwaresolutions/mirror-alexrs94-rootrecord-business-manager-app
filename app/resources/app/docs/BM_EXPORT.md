@@ -29,7 +29,33 @@ Destination defaults to `Desktop\rootrecord-bm-export-<timestamp>`. Use `-Output
 
 ## UI screenshots
 
-See **`screenshots/`** in this `docs/` folder (`photo_*.jpg`) for visual context of the shipped app.
+Shipped app captures live in **`screenshots/`** (`photo_*.jpg`). Inline gallery (same images):
+
+**photo_1** — ![](screenshots/photo_1_2026-04-29_17-29-31.jpg)
+
+**photo_2** — ![](screenshots/photo_2_2026-04-29_17-29-31.jpg)
+
+**photo_3** — ![](screenshots/photo_3_2026-04-29_17-29-31.jpg)
+
+**photo_4** — ![](screenshots/photo_4_2026-04-29_17-29-31.jpg)
+
+**photo_5** — ![](screenshots/photo_5_2026-04-29_17-29-31.jpg)
+
+**photo_6** — ![](screenshots/photo_6_2026-04-29_17-29-31.jpg)
+
+**photo_7** — ![](screenshots/photo_7_2026-04-29_17-29-31.jpg)
+
+**photo_8** — ![](screenshots/photo_8_2026-04-29_17-29-31.jpg)
+
+**photo_9** — ![](screenshots/photo_9_2026-04-29_17-29-31.jpg)
+
+**photo_10** — ![](screenshots/photo_10_2026-04-29_17-29-31.jpg)
+
+**photo_11** — ![](screenshots/photo_11_2026-04-29_17-29-31.jpg)
+
+**photo_12** — ![](screenshots/photo_12_2026-04-29_17-29-31.jpg)
+
+The Android master prompt (`ANDROID_PORT_MASTER_PROMPT.md`) duplicates this gallery in **§1A** for a single-doc handoff.
 
 ## Android port (Weather-style)
 

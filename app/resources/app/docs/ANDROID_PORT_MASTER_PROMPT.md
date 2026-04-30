@@ -55,7 +55,7 @@ Match **Weather Manager mobile** in **process**, not necessarily in stack line-f
    - `app/resources/app/README.md` — install paths, env vars, subscription/entitlement rules, updater.  
    - `app/resources/app/docs/RELEASE.md` — shipping and signing (Windows-specific; adapt principles for Android signing).  
    - `app/resources/app/docs/BM_EXPORT.md` — layout, export script, reading order.  
-   - `app/resources/app/docs/screenshots/` — UI reference.
+   - `app/resources/app/docs/screenshots/` — UI reference (see **§1A** below for inlined images in this file; same gallery in `BM_EXPORT.md`).
 
 3. **Weather Manager mobile (process + code template)**  
    **Clone and read:** [https://github.com/RootRecord/rr-weather-manager-mobile](https://github.com/RootRecord/rr-weather-manager-mobile)  
@@ -70,6 +70,36 @@ Match **Weather Manager mobile** in **process**, not necessarily in stack line-f
    - Workspace reference env (non-secret mirror): repo root **`rootrecord-sites-reference.env`** (Stripe publishable + pricing table IDs, public URLs).
 
 Do **not** invent new API hosts or D1 schemas; extend only what the Workers already expose.
+
+---
+
+## 1A. UI screenshots (desktop reference — inline)
+
+Shipped **Windows / Electron** app captures. Use these for layout, density, and module coverage before you design Android screens. Same files as `docs/screenshots/photo_*.jpg` (paths below are relative to this file in `docs/`).
+
+**photo_1** — ![](screenshots/photo_1_2026-04-29_17-29-31.jpg)
+
+**photo_2** — ![](screenshots/photo_2_2026-04-29_17-29-31.jpg)
+
+**photo_3** — ![](screenshots/photo_3_2026-04-29_17-29-31.jpg)
+
+**photo_4** — ![](screenshots/photo_4_2026-04-29_17-29-31.jpg)
+
+**photo_5** — ![](screenshots/photo_5_2026-04-29_17-29-31.jpg)
+
+**photo_6** — ![](screenshots/photo_6_2026-04-29_17-29-31.jpg)
+
+**photo_7** — ![](screenshots/photo_7_2026-04-29_17-29-31.jpg)
+
+**photo_8** — ![](screenshots/photo_8_2026-04-29_17-29-31.jpg)
+
+**photo_9** — ![](screenshots/photo_9_2026-04-29_17-29-31.jpg)
+
+**photo_10** — ![](screenshots/photo_10_2026-04-29_17-29-31.jpg)
+
+**photo_11** — ![](screenshots/photo_11_2026-04-29_17-29-31.jpg)
+
+**photo_12** — ![](screenshots/photo_12_2026-04-29_17-29-31.jpg)
 
 ---
 
@@ -194,7 +224,8 @@ REFERENCE IMPLEMENTATION — WEATHER MANAGER ANDROID (clone and actually read th
 
 DESKTOP PRODUCT YOU ARE PORTING — BUSINESS MANAGER
 - App snapshot repo (Electron + SQLite, what to parity): https://github.com/RootRecord/rootrecord-business-manager-app
-- After clone, work from app/resources/app/: README.md, docs/BM_EXPORT.md, docs/ANDROID_PORT_MASTER_PROMPT.md (this file’s sections 2–7), docs/screenshots/, src/main/licenseService.js, src/main/database.js, src/main/paths.js, renderer as UX reference (expect a full mobile UI rewrite).
+- After clone, work from app/resources/app/: README.md, docs/BM_EXPORT.md, docs/ANDROID_PORT_MASTER_PROMPT.md (sections 1A + 2–7), docs/screenshots/, src/main/licenseService.js, src/main/database.js, src/main/paths.js, renderer as UX reference (expect a full mobile UI rewrite).
+- VISUAL UI (mandatory): Open every JPG under docs/screenshots/ (photo_1 … photo_12). On GitHub, the same images are inlined in ANDROID_PORT_MASTER_PROMPT.md section “1A”: https://github.com/RootRecord/rootrecord-business-manager-app/blob/master/app/resources/app/docs/ANDROID_PORT_MASTER_PROMPT.md
 
 OPTIONAL FULL MONOREPO (only if the operator gives you this tree instead of the BM snapshot)
 - https://github.com/RootRecord/rootrecord-workspace — may contain Mobile App Development/ as a checkout; Weather’s canonical remote is still https://github.com/RootRecord/rr-weather-manager-mobile , not “whatever folder name exists locally.”

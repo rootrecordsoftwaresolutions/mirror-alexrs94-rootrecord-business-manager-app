@@ -5,3 +5,12 @@
 Thumbs.db
 # Too large for GitHub; build locally or pull from Releases
 **/RootRecordBusinessManager.exe
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials

@@ -8,6 +8,6 @@
 > **Live Pacific:** [RootRecord-Pacific-Solar-Server](https://github.com/RootRecord-Software-Solutions/RootRecord-Pacific-Solar-Server)  
 > **Library:** [RootRecord-Library](https://github.com/RootRecord-Software-Solutions/RootRecord-Library)
 
-Static inventory mirror from the 2026-08 account consolidation. **Do not develop against this repo.** Product track: Business Manager (catalog §7 / track D).
+Mirror of alexrs94 business-manager-app variant. **Do not develop here.** Product track C (Business Manager).
 
 *Transition banner 2026-09-28 HST.*
